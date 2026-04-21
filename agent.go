@@ -34,10 +34,10 @@ type Agent struct {
 // Event is emitted during a Run to allow streaming UIs to react in real time.
 type Event struct {
 	Type     EventType
-	Content  string          // for Token, ThoughtTag, ToolResult, Final
-	ToolName string          // for ToolStart, ToolResult
-	ToolArgs json.RawMessage // for ToolStart
-	Err      error           // for ErrorEvent
+	Content  string          // for EventToolResult, EventFinal
+	ToolName string          // for EventToolStart, EventToolResult
+	ToolArgs json.RawMessage // for EventToolStart
+	Err      error           // for EventError
 }
 
 // EventType categorizes an Event.
@@ -112,7 +112,13 @@ func (a *Agent) Run(ctx context.Context, userPrompt string) (RunResult, error) {
 		}
 		resp, err := a.Transport.Chat(ctx, req)
 		if err != nil {
-			result.Stopped = StopReasonError
+			// Distinguish context cancellation from genuine errors so callers
+			// can tell "user cancelled" from "model or network failed".
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				result.Stopped = StopReasonCancelled
+			} else {
+				result.Stopped = StopReasonError
+			}
 			return result, fmt.Errorf("iteration %d: chat: %w", iter, err)
 		}
 		result.Iterations++
@@ -139,6 +145,10 @@ func (a *Agent) Run(ctx context.Context, userPrompt string) (RunResult, error) {
 			assistantMsg.Content = strings.TrimSpace(remaining)
 		}
 
+		// Attach tool calls to the assistant message so the next iteration's
+		// replay carries them. Transports require this to reconstruct the
+		// provider-specific tool_calls / tool_use shape on the wire.
+		assistantMsg.ToolCalls = toolCalls
 		messages = append(messages, assistantMsg)
 
 		if len(toolCalls) == 0 {
@@ -203,7 +213,8 @@ func (a *Agent) Run(ctx context.Context, userPrompt string) (RunResult, error) {
 		}
 	}
 
+	// Max iterations hit. Leave FinalMessage empty so callers can distinguish
+	// this from a genuine final answer via result.Stopped.
 	result.Stopped = StopReasonMaxIterations
-	result.FinalMessage = "[agent stopped: max iterations reached]"
 	return result, nil
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -35,6 +36,11 @@ func (*FetchURL) Name() string { return "fetch_url" }
 func (*FetchURL) Description() string {
 	return "Fetch a URL and return its text content. Supports HTML, plain text, XHTML, and JSON. PDFs should use fetch_pdf instead. Rejects binary content types and responses over 10 MB."
 }
+
+// This tool does NOT implement SSRF protection (private-IP blocking, scheme
+// allow-listing, DNS pinning). Callers wrapping agentic in a server must
+// add their own guard before invoking FetchURL from an untrusted prompt —
+// see CivNode's internal/researchagent for a production wrapping.
 func (*FetchURL) Schema() json.RawMessage {
 	return json.RawMessage(`{
 		"type":"object",
@@ -52,6 +58,15 @@ func (f *FetchURL) Invoke(ctx context.Context, args json.RawMessage) (string, er
 	}
 	if in.URL == "" {
 		return "", fmt.Errorf("url is required")
+	}
+	// Scheme check — reject file://, ftp://, gopher://, etc. before the
+	// HTTP client turns them into a confusing error.
+	parsed, err := url.Parse(in.URL)
+	if err != nil {
+		return "", fmt.Errorf("invalid url: %w", err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", fmt.Errorf("unsupported scheme %q (only http/https)", parsed.Scheme)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", in.URL, nil)

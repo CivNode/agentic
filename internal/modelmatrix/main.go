@@ -44,10 +44,9 @@ func (*weatherTool) Invoke(ctx context.Context, args json.RawMessage) (string, e
 
 func main() {
 	models := []string{
-		"qwen3.5:8b",
+		"qwen3:8b",
 		"qwen3.5:27b",
 		"qwen3.5:35b-a3b",
-		"qwen3:8b",
 		"llama3.3:latest",
 		"mistral-small:latest",
 		"mistral-nemo:latest",
@@ -55,6 +54,10 @@ func main() {
 
 	prompt := "Use the get_weather tool to find the weather in Paris, then summarize in one sentence."
 
+	// Preamble with run context so readers understand what the table means.
+	date := time.Now().UTC().Format("2006-01-02")
+	fmt.Printf("# Reliability matrix\n\n")
+	fmt.Printf("Run date: %s. Each model given up to 300s per run. The task is two-round: call `get_weather`, then produce a one-sentence summary after the tool returns. A \"Yes / Yes\" row means the model both called the tool and produced a coherent final answer. Failures on larger models on modest hardware are usually wall-clock limits, not transport bugs — the library's multi-round protocol is exercised separately by `tests/integration/TestOllamaIntegration_MultiRound`.\n\n", date)
 	fmt.Println("| Model | Tool call? | Final answer? | Iterations | Duration |")
 	fmt.Println("|-------|-----------|---------------|------------|----------|")
 
@@ -65,7 +68,7 @@ func main() {
 			Tools:         []agentic.Tool{&weatherTool{}},
 			MaxIterations: 5,
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 		start := time.Now()
 		result, err := agent.Run(ctx, prompt)
 		elapsed := time.Since(start)

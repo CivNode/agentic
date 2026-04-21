@@ -144,6 +144,28 @@ func encodeMessages(msgs []agentic.Message) []map[string]interface{} {
 			entry["tool_call_id"] = m.ToolCallID
 			entry["name"] = m.Name
 		}
+		// Preserve assistant tool calls on replay. OpenAI rejects tool-role
+		// messages whose tool_call_id refers to a tool_call the assistant
+		// turn no longer declares — without this we get 400s on iteration 2.
+		if m.Role == agentic.RoleAssistant && len(m.ToolCalls) > 0 {
+			tcs := make([]map[string]interface{}, len(m.ToolCalls))
+			for j, tc := range m.ToolCalls {
+				tcs[j] = map[string]interface{}{
+					"id":   tc.ID,
+					"type": "function",
+					"function": map[string]interface{}{
+						"name":      tc.Name,
+						"arguments": string(tc.Args),
+					},
+				}
+			}
+			entry["tool_calls"] = tcs
+			// When assistant produced only tool_calls, content should be
+			// null rather than empty string per OpenAI's schema.
+			if m.Content == "" {
+				entry["content"] = nil
+			}
+		}
 		out[i] = entry
 	}
 	return out

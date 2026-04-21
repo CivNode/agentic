@@ -87,11 +87,18 @@ func (s *SearchArxiv) Invoke(ctx context.Context, args json.RawMessage) (string,
 		for j, a := range e.Authors {
 			authors[j] = a.Name
 		}
+		// Trim published to a YYYY-MM-DD prefix when available; some arxiv
+		// entries have shorter or malformed strings and slicing blindly
+		// panics.
+		pub := e.Published
+		if len(pub) >= 10 {
+			pub = pub[:10]
+		}
 		fmt.Fprintf(&b, "%d. %s\n   Authors: %s\n   Published: %s\n   URL: %s\n   Abstract: %s\n\n",
 			i+1,
 			strings.TrimSpace(e.Title),
 			strings.Join(authors, ", "),
-			e.Published[:10],
+			pub,
 			e.ID,
 			strings.TrimSpace(e.Summary),
 		)

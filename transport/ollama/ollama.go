@@ -159,6 +159,24 @@ func encodeMessages(msgs []agentic.Message) []map[string]interface{} {
 		if m.Role == agentic.RoleTool && m.Name != "" {
 			entry["name"] = m.Name
 		}
+		// Preserve assistant tool calls on replay so the model has coherent
+		// history. Without this, Ollama treats the assistant turn as if it
+		// never called any tool and the subsequent tool-role message is
+		// dangling; qwen/llama then apologise or re-call in a loop.
+		if m.Role == agentic.RoleAssistant && len(m.ToolCalls) > 0 {
+			tcs := make([]map[string]interface{}, len(m.ToolCalls))
+			for j, tc := range m.ToolCalls {
+				var args map[string]interface{}
+				_ = json.Unmarshal(tc.Args, &args)
+				tcs[j] = map[string]interface{}{
+					"function": map[string]interface{}{
+						"name":      tc.Name,
+						"arguments": args,
+					},
+				}
+			}
+			entry["tool_calls"] = tcs
+		}
 		out[i] = entry
 	}
 	return out

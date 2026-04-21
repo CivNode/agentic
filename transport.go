@@ -40,15 +40,15 @@ type ChatRequest struct {
 	Model     string
 	Messages  []Message
 	Tools     []Tool // ignored by transports that do not support tools
-	MaxTokens int    // 0 means transport default
-	Stream    bool   // if true, the transport emits partial responses via OnToken
-	OnToken   func(string)
+	MaxTokens int    // 0 means transport default (see each transport's docs)
 }
 
-// ChatResponse is what the LLM returned.
+// ChatResponse is what the LLM returned. On native tool-use, ToolCalls is
+// populated and Message.Content may be empty. On fallback tool-use, ToolCalls
+// is empty at this layer — the Agent parses them from Message.Content.
 type ChatResponse struct {
 	Message   Message
-	ToolCalls []ToolCall // populated on native tool-use; parsed from body on fallback
+	ToolCalls []ToolCall
 	Usage     Usage
 }
 

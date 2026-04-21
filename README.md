@@ -4,11 +4,11 @@ A reliable, LLM-agnostic tool-use agent runtime in Go. Works with Ollama, any Op
 
 ## Quickstart
 
-Install and run the example researcher against your local Ollama:
+With Ollama running locally and a tool-capable model pulled (e.g. `ollama pull qwen3:8b`), run the hello example:
 
 ```bash
-go install github.com/CivNode/agentic/examples/hello@latest
-hello   # answers "what time is it?" using a tool
+AGENTIC_MODEL=qwen3:8b go run github.com/CivNode/agentic/examples/hello@latest
+# prints the current UTC time via a say_time tool call
 ```
 
 Or build your own agent in ten lines:
@@ -42,8 +42,8 @@ func main() {
 - **LLM-agnostic.** Three built-in transports: Ollama, OpenAI-compatible (OpenAI, Z.ai, Groq, Mistral, Together, xAI), and Anthropic. Add your own by implementing one interface.
 - **Two tool-call paths.** Native (llama3.1+, qwen2.5+, mistral-nemo/small, command-r, claude, gpt-4) or prompt-based fallback for models that were not trained for tool-use.
 - **Generic web tools.** `tools/web` includes `search_web`, `fetch_url`, `fetch_pdf`, `search_wikipedia`, `search_arxiv`, `extract_citations`. Import only what you need.
-- **Safe defaults.** 10 MB fetch cap, content-type gating, schema validation of tool arguments, iteration cap with context cancellation.
-- **Small.** Core is under 400 lines. No HTTP framework, no deep dependencies.
+- **Safe defaults.** 10 MB fetch cap, content-type gating, scheme allow-list (http/https), schema validation of tool arguments, iteration cap with context cancellation.
+- **Small.** Core is under 500 lines. No HTTP framework, no deep dependencies.
 
 ## Interfaces
 
@@ -113,6 +113,8 @@ import "github.com/CivNode/agentic/transport/anthropic"
 tr := anthropic.New("https://api.anthropic.com", "sk-ant-...")
 ```
 
+Anthropic requires `max_tokens` on every request; agentic defaults this to 4096 when `ChatRequest.MaxTokens` is zero. Set `MaxTokens` explicitly for longer responses.
+
 ## Implementing your own tool
 
 ```go
@@ -141,7 +143,9 @@ func (*myTool) Invoke(ctx context.Context, args json.RawMessage) (string, error)
 - The `fetch_url` and `fetch_pdf` tools cap responses at 10 MB. Binary content types are rejected.
 - The agent validates every tool call's JSON arguments against the tool's JSON Schema before invoking.
 - `MaxIterations` bounds the loop. Context cancellation stops the agent between iterations.
-- SSRF, rate limiting, and caching are **not** in the package — they belong in your calling code where you can tune them for your environment. See CivNode's `internal/researchagent` for a full production wrapping.
+- SSRF protection, rate limiting, and caching are **not** in the package — they belong in your calling code where you can tune them for your environment.
+
+The `fetch_url` and `fetch_pdf` tools will fetch any public http/https URL the model asks for. Before exposing this library behind a web-facing server, add an SSRF guard (reject RFC1918, loopback, link-local, and your own internal hostnames) and per-caller rate limits.
 
 ## Testing
 
@@ -157,4 +161,4 @@ MIT. Use it however you want.
 ## Related
 
 - `github.com/CivNode/agentic` was built for CivNode's research agent. See [civnode.com](https://civnode.com).
-- MCP (Model Context Protocol) interop is on the Phase 2 roadmap. Track the issue tracker.
+- MCP (Model Context Protocol) interop is on the roadmap. Track the issue tracker.

@@ -151,6 +151,34 @@ func encodeMessages(msgs []agentic.Message) []map[string]interface{} {
 			})
 			continue
 		}
+		// Preserve assistant tool_use blocks on replay. Anthropic requires
+		// that a tool_result block refers to a tool_use block in the
+		// preceding assistant message; without this the next request 400s
+		// with "tool_result blocks must follow tool_use blocks".
+		if m.Role == agentic.RoleAssistant && len(m.ToolCalls) > 0 {
+			blocks := make([]map[string]interface{}, 0, len(m.ToolCalls)+1)
+			if m.Content != "" {
+				blocks = append(blocks, map[string]interface{}{
+					"type": "text",
+					"text": m.Content,
+				})
+			}
+			for _, tc := range m.ToolCalls {
+				var input map[string]interface{}
+				_ = json.Unmarshal(tc.Args, &input)
+				blocks = append(blocks, map[string]interface{}{
+					"type":  "tool_use",
+					"id":    tc.ID,
+					"name":  tc.Name,
+					"input": input,
+				})
+			}
+			out = append(out, map[string]interface{}{
+				"role":    "assistant",
+				"content": blocks,
+			})
+			continue
+		}
 		out = append(out, map[string]interface{}{
 			"role":    string(m.Role),
 			"content": m.Content,

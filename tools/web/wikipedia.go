@@ -72,7 +72,7 @@ func (s *SearchWikipedia) Invoke(ctx context.Context, args json.RawMessage) (str
 	}
 	var b strings.Builder
 	for i, p := range out.Pages {
-		fmt.Fprintf(&b, "%d. %s — %s\n   https://en.wikipedia.org/wiki/%s\n   %s\n\n", i+1, p.Title, p.Description, p.Key, stripHTML(p.Excerpt))
+		fmt.Fprintf(&b, "%d. %s — %s\n   https://en.wikipedia.org/wiki/%s\n   %s\n\n", i+1, p.Title, p.Description, url.PathEscape(p.Key), stripHTML(p.Excerpt))
 	}
 	return b.String(), nil
 }
