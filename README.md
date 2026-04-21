@@ -161,4 +161,5 @@ MIT. Use it however you want.
 ## Related
 
 - `github.com/CivNode/agentic` was built for CivNode's research agent. See [civnode.com](https://civnode.com).
+- Announcement: [A tool-use runtime for whichever LLM you already have](https://civnode.com/quark/blog/d8445063-5d3e-4b23-812d-d91513cb5ec6)
 - MCP (Model Context Protocol) interop is on the roadmap. Track the issue tracker.
